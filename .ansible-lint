@@ -1,0 +1,16 @@
+exclude_paths:
+  - .pre-commit-config.yaml
+  - .github/
+  - .pytest_cache/
+  - .cache/
+  - __pycache__/
+  - molecule/*/tests/
+
+use_default_rules: true
+parseable: true
+offline: true
+
+# Enforce best practices
+enable_list:
+  - yaml
+  - core

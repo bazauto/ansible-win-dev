@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iputils-ping \
     openssh-client \
     python3-venv \
+    python3-pip \
     sudo \
     gnupg2 \
     lsb-release \
@@ -35,4 +36,5 @@ WORKDIR /workspace
 
 # Copy requirements and install Python deps
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt

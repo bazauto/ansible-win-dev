@@ -27,6 +27,5 @@
     "CONTAINER_HOST": "unix:///run/podman/podman.sock",
     "CONTAINER_STORAGE_DRIVER": "vfs"
   },
-  "postCreateCommand": "pip install -r requirements.txt",
   "remoteUser": "vscode"
 }

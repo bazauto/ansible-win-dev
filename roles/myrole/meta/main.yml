@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: "myrole"
+  namespace: "bazauto"
+  author: "Paul Barrett"
+  description: "A sample Ansible role for internal Debian projects"
+  company: "BAZAutomation"
+  license: "MIT"
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Debian
+      versions:
+        - 'all'
+  galaxy_tags:
+    - ansible
+    - debian
+    - internal
+
+dependencies: []

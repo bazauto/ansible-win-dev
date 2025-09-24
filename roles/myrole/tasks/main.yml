@@ -1,0 +1,7 @@
+---
+- name: Create Configuration File
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: /tmp/hello-world.txt
+    mode: '0644'
+    force: false

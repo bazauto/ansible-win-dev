@@ -1,0 +1,7 @@
+ansible-core==2.16.6
+ansible-lint==24.9.2
+molecule[docker]==24.2.1
+molecule-plugins[podman]
+yamllint==1.35.1
+pytest==8.3.3
+ansible-creator==25.9.0

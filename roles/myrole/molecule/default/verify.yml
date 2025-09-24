@@ -1,0 +1,13 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Check if /tmp/hello-world.txt exists
+      ansible.builtin.stat:
+        path: /tmp/hello-world.txt
+      register: test_file
+
+    - name: Assert /tmp/hello-world.txt exists
+      ansible.builtin.assert:
+        that:
+          - test_file.stat.exists

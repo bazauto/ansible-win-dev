@@ -58,6 +58,68 @@ function Invoke-AdminPhase {
     # 2. Set WSL2 as default (no need to check, running this multiple times is safe)
     if ($WhatIf) { Write-Host "WhatIf: would run 'wsl --set-default-version 2'" } else { wsl --set-default-version 2 }
 
+    # 2.5 Install Podman for Windows host (so users can run containers on the Windows side)
+    # Prefer winget; fall back to Chocolatey if available. Be idempotent and respect -WhatIf.
+    function Test-PodmanOnWindows {
+        try {
+            $p = Get-Command podman -ErrorAction SilentlyContinue
+            return $null -ne $p
+        } catch { return $false }
+    }
+
+    if (-not (Test-PodmanOnWindows)) {
+        Write-Host "Podman not found on Windows host. Attempting to install Podman for Windows..."
+        if ($WhatIf) {
+            Write-Host "WhatIf: would query GitHub releases for the latest Podman Windows installer, download it to TEMP and run a silent install."
+        }
+        else {
+            Write-Host "Attempting direct Podman installer from GitHub releases..."
+            $ghApi = 'https://api.github.com/repos/containers/podman/releases/latest'
+            try {
+                Write-Host "Querying GitHub releases for latest Podman Windows installer..."
+                $release = Invoke-RestMethod -Uri $ghApi -UseBasicParsing -ErrorAction Stop
+                $asset = $release.assets | Where-Object { $_.name -match '(?i)(windows|win)' -and $_.name -match '(?i)\.(msi|exe)$' } | Select-Object -First 1
+                if ($null -eq $asset) {
+                    Write-Host "Could not find a Windows installer asset in the latest Podman release."
+                    Write-Host "Please install Podman for Windows manually: https://podman.io/getting-started/installation#windows"
+                }
+                else {
+                    $url = $asset.browser_download_url
+                    $outFile = Join-Path $env:TEMP $asset.name
+                    Write-Host "Downloading Podman installer $($asset.name) to $outFile..."
+                    Invoke-WebRequest -Uri $url -OutFile $outFile -UseBasicParsing -ErrorAction Stop
+                    Write-Host "Running installer..."
+                    if ($outFile -match '\.msi$') {
+                        Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', "`"$outFile`"", '/qn', '/norestart' -Wait
+                    }
+                    else {
+                        try {
+                            # Many NSIS/innosetup installers support /S or /silent - try common flag
+                            Start-Process -FilePath $outFile -ArgumentList '/S' -Wait -ErrorAction Stop
+                        } catch {
+                            Write-Host "Could not run installer silently. Please run $outFile manually to complete Podman installation."
+                        }
+                    }
+                    Remove-Item -Path $outFile -ErrorAction SilentlyContinue
+                }
+            } catch {
+                Write-Host "Direct installer attempt failed: $($_.Exception.Message)"
+                Write-Host "Please install Podman for Windows manually from: https://podman.io/getting-started/installation#windows"
+            }
+        }
+
+        # Final check
+        if (Test-PodmanOnWindows) {
+            Write-Host "Podman successfully installed on Windows host."
+        }
+        else {
+            Write-Host "Podman is still not available on Windows host after attempted installs. Dev Containers may still work using Podman inside WSL; see README for manual steps."
+        }
+
+        # Podman machine setup will be performed in the user post-admin phase.
+    }
+    else { Write-Host "Podman already present on Windows host." }
+
     # Write sentinel to signal completion (0 = success). If SentinelPath not provided, skip.
     Write-Host "Admin phase completed. Writing sentinel file if specified. (Path: $SentinelPath)"
     if (-not [string]::IsNullOrWhiteSpace($SentinelPath)) {
@@ -209,6 +271,34 @@ fi
     }
     else { Write-Host ".bashrc already configured for Podman auto-start." }
 
+    # Ensure Podman machine is initialized and started on Windows (run as normal user). Idempotent.
+    try {
+        $p = Get-Command podman -ErrorAction SilentlyContinue
+        if (-not $p) { Write-Host "Podman not found on Windows host; skipping machine setup."; return }
+        $podmanCmd = $p.Source
+    } catch {
+        Write-Host "Could not locate podman executable. Skipping machine setup."
+        return
+    }
+
+    if ($WhatIf) { Write-Host "WhatIf: would run 'podman machine inspect default', 'podman machine init' (if missing) and 'podman machine start'."; return }
+
+    $machineExists = $false
+    try {
+        & $podmanCmd machine inspect default > $null 2>&1
+        if ($LASTEXITCODE -eq 0) { $machineExists = $true }
+    } catch { $machineExists = $false }
+
+    if (-not $machineExists) {
+        Write-Host "Initializing podman machine 'default'..."
+        try { & $podmanCmd machine init } catch { Write-Host "podman machine init failed: $($_.Exception.Message)" }
+    }
+
+    Write-Host "Starting podman machine (if not already running)..."
+    try { & $podmanCmd machine start } catch { Write-Host "podman machine start failed: $($_.Exception.Message)" }
+
+    Write-Host "Checking podman system connections..."
+    try { & $podmanCmd system connection list } catch { Write-Host "podman system connection list failed: $($_.Exception.Message)" }
 
 }
 
